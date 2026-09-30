@@ -1,0 +1,13 @@
+ID,supplier,amount,currency_code,description,status,matchedPO_ID
+1ec9665c-7e47-4c31-89aa-a64711458f5f,Acme Industrial Supply,12500.00,USD,Steel brackets - bulk order,matched,a7cbe2af-463d-47f7-9a01-72b1344d2d6c
+73771f62-36a3-4132-adbb-f5d93d535a60,Acme Industrial Supply,4150.00,USD,Conveyor belt replacement (partial),open,
+3553e72f-9d40-483b-b02f-4a5c627c62d0,Northwind Logistics,8900.50,USD,Q3 pallet shipment freight,matched,05a63464-02c9-4087-8096-bc7bc24dacdc
+7db541e6-802a-437a-bba9-fee5772e567c,Northwind Logistics,15300.00,USD,Warehouse racking install,escalated,c75e00a2-4503-4a40-ba9d-810d12d38d5f
+6dc788bb-c49d-4c21-90e7-03b9701740d1,Blue Ridge Packaging,3150.75,USD,Shipping boxes - 10k units,open,
+195d76bb-0de1-41bc-9414-31024fe0adec,Summit Office Solutions,9800.00,USD,Desk chairs x40,matched,cc82101d-6e18-44a9-8590-d89dcbe3a161
+b680d6c6-478f-47e5-b59d-cd0e0e713d6c,Pinnacle IT Services,22000.00,EUR,Server maintenance annual contract,matched,0e1bf366-2b65-4afa-bdfe-b2e884501931
+c0856f60-843f-4603-bdb8-b6c0b8963531,Coastal Freight Co.,17650.00,USD,Container #4471 ocean freight,open,
+f73e6df2-53d2-4141-b4cd-4f890baf4648,Acme Industrial Supply,12480.00,USD,Steel brackets bulk order (possible duplicate),escalated,a7cbe2af-463d-47f7-9a01-72b1344d2d6c
+2844962c-3919-483e-96a6-7a1152c01fc4,Northwind Logistics,15250.00,USD,Pallet racking - partial delivery,escalated,c75e00a2-4503-4a40-ba9d-810d12d38d5f
+fac3cea2-6774-49ad-9f39-a4aced40aa8e,Meridian Office Interiors,18750.00,USD,Office furniture delivery,open,
+def1b024-fb32-4136-aa3b-65b953ddc0a9,Harborline Equipment Rentals,6275.00,USD,Forklift rental Q4,open,

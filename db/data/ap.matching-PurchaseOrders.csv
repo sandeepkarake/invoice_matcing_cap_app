@@ -1,0 +1,11 @@
+ID,supplier,lineItem,amount,currency_code,isOpen
+a7cbe2af-463d-47f7-9a01-72b1344d2d6c,Acme Industrial Supply,Steel brackets - bulk order,12500.00,USD,false
+37d05066-f30f-4ac5-90ab-582990b09464,Acme Industrial Supply,Replacement conveyor belts,4200.00,USD,true
+05a63464-02c9-4087-8096-bc7bc24dacdc,Northwind Logistics,Freight - Q3 pallet shipment,8900.50,USD,false
+c75e00a2-4503-4a40-ba9d-810d12d38d5f,Northwind Logistics,Warehouse pallet racking,15300.00,USD,false
+b722dca6-790e-4fd6-ac06-d382aeeaaeaf,Blue Ridge Packaging,Corrugated shipping boxes - 10k units,3150.75,USD,true
+cc82101d-6e18-44a9-8590-d89dcbe3a161,Summit Office Solutions,Ergonomic desk chairs x40,9800.00,USD,false
+0e1bf366-2b65-4afa-bdfe-b2e884501931,Pinnacle IT Services,Annual server maintenance contract,22000.00,EUR,false
+cf6a8b3b-f9ef-44df-b272-e4467582e044,Coastal Freight Co.,Ocean freight - container #4471,17650.00,USD,true
+2d7bb189-983e-4639-85f2-560dae3283bb,Meridian Office Interiors,Height-adjustable workstation - 25 units,18750.00,USD,true
+a6f070bb-516f-424e-99bc-e77b16b3dadc,Harborline Equipment Rentals,Forklift rental - Q4,6200.00,USD,true

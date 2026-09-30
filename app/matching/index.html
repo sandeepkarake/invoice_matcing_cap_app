@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Invoice Matching</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; margin: 0; background: #f4f5f7; color: #1a1c1e; }
+  header { background: #354a5f; color: white; padding: 14px 24px; }
+  header h1 { margin: 0; font-size: 1.2rem; }
+  main { max-width: 1200px; margin: 0 auto; padding: 20px; }
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .panel { background: white; border: 1px solid #dde1e6; border-radius: 6px; }
+  .panel h2 { margin: 0; padding: 10px 14px; font-size: 1rem; border-bottom: 1px solid #dde1e6; background: #fafbfc; }
+  .list { max-height: 420px; overflow-y: auto; }
+  .item { padding: 10px 14px; border-bottom: 1px solid #eee; cursor: pointer; }
+  .item:hover { background: #f0f6fb; }
+  .item.selected { background: #e6f2fb; border-left: 3px solid #0a6ed1; }
+  .item .top { display: flex; justify-content: space-between; font-weight: 600; }
+  .item .desc { color: #6b7280; font-size: 0.85rem; margin-top: 2px; }
+  .supplier-details { margin-top: 6px; padding: 6px 8px; border-radius: 4px; background: #f4f5f7; font-size: 0.78rem; color: #354a5f; }
+  .supplier-details.blocked { background: #fce5e5; color: #bb0000; }
+  .supplier-details .badge-blocked { display: inline-block; font-weight: 700; text-transform: uppercase; font-size: 0.7rem; margin-left: 6px; }
+  .empty { padding: 16px; color: #6b7280; font-size: 0.85rem; }
+  .actions { text-align: center; margin: 16px 0; }
+  .actions button { padding: 8px 18px; font-size: 0.9rem; font-weight: 600; border: none; border-radius: 4px; background: #0a6ed1; color: white; cursor: pointer; }
+  .actions button:disabled { background: #ccc; cursor: not-allowed; }
+  section.pending { background: white; border: 1px solid #dde1e6; border-radius: 6px; margin-top: 20px; }
+  section.pending h2 { margin: 0; padding: 10px 14px; font-size: 1rem; border-bottom: 1px solid #dde1e6; background: #fafbfc; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #eee; }
+  th { background: #fafbfc; }
+  .btn-approve { background: #107e3e; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 600; }
+  .btn-reject { background: #bb0000; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 600; margin-left: 6px; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: #1a1c1e; color: white; padding: 10px 18px; border-radius: 4px; font-size: 0.85rem; opacity: 0; transition: opacity 0.3s; max-width: 400px; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header><h1>Invoice Matching</h1></header>
+<main>
+  <div class="panels">
+    <div class="panel">
+      <h2>Open Invoices</h2>
+      <div id="invoiceList" class="list"></div>
+    </div>
+    <div class="panel">
+      <h2>Open Purchase Orders</h2>
+      <div id="poList" class="list"></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="recordMatchBtn" disabled>Record Match</button>
+  </div>
+
+  <section class="pending">
+    <h2>Pending Decisions</h2>
+    <div id="pendingTable"></div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const SRV = '/odata/v4/matching';
+let invoices = [], purchaseOrders = [], decisions = [], supplierInfoByName = {};
+let selectedInvoice = null, selectedPO = null;
+
+const BLOCK_REASON_LABELS = {
+  B: 'Duplicate invoice suspected',
+  A: 'Audit review',
+  C: 'Price variance',
+  R: 'Awaiting documentation',
+};
+
+async function api(path, opts) {
+  const res = await fetch(SRV + path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error?.message || res.statusText);
+  return body;
+}
+
+function toast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = isError ? '#bb0000' : '#1a1c1e';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function fmtAmount(amount, currency) {
+  return Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currency;
+}
+
+async function loadSupplierInfo() {
+  const res = await api('/SupplierInfo');
+  supplierInfoByName = Object.fromEntries(res.value.map(d => [d.name, d]));
+}
+
+function renderSupplierDetails(supplierName) {
+  const d = supplierInfoByName[supplierName];
+  if (!d) return '';
+  const blocked = !!d.blockedForPosting;
+  const reasonLabel = d.paymentBlockingReason ? (BLOCK_REASON_LABELS[d.paymentBlockingReason] || d.paymentBlockingReason) : '';
+  return `
+    <div class="supplier-details ${blocked ? 'blocked' : ''}">
+      <strong>${d.name}</strong> &middot; Payment terms: ${d.paymentTerms || '—'}
+      ${blocked
+        ? `<span class="badge-blocked">Blocked for posting</span><br>Reason: ${reasonLabel}`
+        : '&middot; Not blocked for posting'}
+    </div>`;
+}
+
+async function loadInvoices() {
+  const res = await api(`/Invoices?$filter=status eq 'open'&$orderby=createdAt`);
+  invoices = res.value;
+  renderInvoices();
+}
+
+async function loadPOs() {
+  const res = await api(`/PurchaseOrders?$filter=isOpen eq true&$orderby=createdAt`);
+  purchaseOrders = res.value;
+  renderPOs();
+}
+
+async function loadPendingDecisions() {
+  const res = await api(`/MatchDecisions?$filter=outcome eq 'proposed'&$orderby=decidedAt desc`);
+  decisions = res.value;
+  renderPending();
+}
+
+function renderInvoices() {
+  const el = document.getElementById('invoiceList');
+  if (!invoices.length) { el.innerHTML = '<div class="empty">No open invoices.</div>'; return; }
+  el.innerHTML = invoices.map(inv => `
+    <div class="item ${selectedInvoice === inv.ID ? 'selected' : ''}" data-id="${inv.ID}">
+      <div class="top"><span>${inv.supplier}</span><span>${fmtAmount(inv.amount, inv.currency_code)}</span></div>
+      <div class="desc">${inv.description}</div>
+      ${renderSupplierDetails(inv.supplier)}
+    </div>`).join('');
+  el.querySelectorAll('.item').forEach(it => it.addEventListener('click', () => {
+    selectedInvoice = it.dataset.id === selectedInvoice ? null : it.dataset.id;
+    renderInvoices();
+    updateRecordButton();
+  }));
+}
+
+function renderPOs() {
+  const el = document.getElementById('poList');
+  if (!purchaseOrders.length) { el.innerHTML = '<div class="empty">No open purchase orders.</div>'; return; }
+  el.innerHTML = purchaseOrders.map(po => `
+    <div class="item ${selectedPO === po.ID ? 'selected' : ''}" data-id="${po.ID}">
+      <div class="top"><span>${po.supplier}</span><span>${fmtAmount(po.amount, po.currency_code)}</span></div>
+      <div class="desc">${po.lineItem}</div>
+    </div>`).join('');
+  el.querySelectorAll('.item').forEach(it => it.addEventListener('click', () => {
+    selectedPO = it.dataset.id === selectedPO ? null : it.dataset.id;
+    renderPOs();
+    updateRecordButton();
+  }));
+}
+
+function updateRecordButton() {
+  document.getElementById('recordMatchBtn').disabled = !(selectedInvoice && selectedPO);
+}
+
+document.getElementById('recordMatchBtn').addEventListener('click', async () => {
+  if (!selectedInvoice || !selectedPO) return;
+  try {
+    await api('/MatchDecisions', {
+      method: 'POST',
+      body: JSON.stringify({
+        invoice_ID: selectedInvoice,
+        purchaseOrder_ID: selectedPO,
+        confidence: 0.90,
+        rationale: 'Amount and description align with the selected PO.',
+      }),
+    });
+    toast('Match recorded.');
+    selectedInvoice = null;
+    selectedPO = null;
+    updateRecordButton();
+    await refreshAll();
+  } catch (e) { toast(e.message, true); }
+});
+
+function renderPending() {
+  const el = document.getElementById('pendingTable');
+  if (!decisions.length) { el.innerHTML = '<div class="empty">No pending decisions.</div>'; return; }
+  const rows = decisions.map(d => `
+    <tr>
+      <td>${d.invoiceDescription}</td>
+      <td>${d.poDescription}</td>
+      <td>${Number(d.confidence).toFixed(2)}</td>
+      <td>${d.rationale || ''}</td>
+      <td>
+        <button class="btn-approve" data-id="${d.ID}" data-action="approveMatch">Approve</button>
+        <button class="btn-reject" data-id="${d.ID}" data-action="rejectMatch">Reject</button>
+      </td>
+    </tr>`).join('');
+  el.innerHTML = `<table>
+    <thead><tr><th>Invoice</th><th>Purchase Order</th><th>Confidence</th><th>Rationale</th><th>Actions</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+  el.querySelectorAll('button[data-action]').forEach(b => b.addEventListener('click', async () => {
+    try {
+      await api(`/MatchDecisions(${b.dataset.id})/MatchingService.${b.dataset.action}`, { method: 'POST', body: '{}' });
+      toast(b.dataset.action === 'approveMatch' ? 'Match approved.' : 'Match rejected.');
+      await refreshAll();
+    } catch (e) { toast(e.message, true); }
+  }));
+}
+
+async function attachDescriptions() {
+  // enrich pending decisions with invoice/PO description text for display
+  const invMap = Object.fromEntries((await api('/Invoices')).value.map(i => [i.ID, i.description]));
+  const poMap = Object.fromEntries((await api('/PurchaseOrders')).value.map(p => [p.ID, p.lineItem]));
+  decisions = decisions.map(d => ({
+    ...d,
+    invoiceDescription: invMap[d.invoice_ID] || d.invoice_ID,
+    poDescription: poMap[d.purchaseOrder_ID] || d.purchaseOrder_ID,
+  }));
+  renderPending();
+}
+
+async function refreshAll() {
+  await Promise.all([loadInvoices(), loadPOs(), loadPendingDecisions()]);
+  await attachDescriptions();
+}
+
+(async function init() {
+  try {
+    await loadSupplierInfo();
+    await refreshAll();
+  } catch (e) { toast(e.message, true); }
+})();
+</script>
+</body>
+</html>
